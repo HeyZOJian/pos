@@ -2,82 +2,115 @@
 var saveMoney = 0.00;
 //TODO: 请在该文件中实现练习要求并删除此注释
 function printReceipt(inputs) {
-  let itemsCountArr = calculateCount(inputs);
-  let itemsPriceInfo = calculatePrice(itemsCountArr);
+  let allproductsInfo = loadAllItems()
+  let allPromotionsInfo = loadPromotions()
+  let totalMoney = 0
+  let saveMoney = 0
+  let originalMoney = 0
+  let formatedBuyList = calculateEachItemAmount(inputs)
+  let receiptItems = generateEachItemReceipt(formatedBuyList, allproductsInfo, allPromotionsInfo);
 
-  return createReceipt(itemsPriceInfo);
+  for (let receiptItem of receiptItems) {
+    totalMoney += parseFloat(receiptItem.subtotal)
+    originalMoney += parseFloat(receiptItem.originalSubtotal)
+  }
+  saveMoney = originalMoney - totalMoney
 
+  let receiptItemString = "";
+  for (const receiptItem of receiptItems) {
+    receiptItemString += "\n";
+    receiptItemString += `名称：${receiptItem.info.name}，数量：${receiptItem.info.count}${receiptItem.info.unit}，单价：${receiptItem.info.price.toFixed(2)}(元)，小计：${receiptItem.subtotal}(元)`
+  }
+
+  const result = `***<没钱赚商店>收据***${receiptItemString}
+----------------------
+总计：${totalMoney.toFixed(2)}(元)
+节省：${saveMoney.toFixed(2)}(元)
+**********************`
+
+  console.log(result);
 }
 
-function getBarcode(barcode) {
+function getBarcodeWithoutSpecialChar(barcode) {
   if (barcode.indexOf('-') > 0) {
     return barcode.substr(0, barcode.indexOf('-'));
   }
-  return barcode;
+  return barcode
 }
 
-function calculateCount(inputs) {
-  let itemsCountArr = [];
-  let mark = new Set();
-  for (let i = 0; i < inputs.length; i++) {
-    const match = getBarcode(inputs[i]);
-    if (mark.has(match)) continue;
-    mark.add(match);
-    let count = 0;
-    for (let j = 0; j < inputs.length; j++) {
-      const element = inputs[j];
-      let num = 1;
-      let barcode = getBarcode(element);
-      if (element.indexOf('-') > 0) {
-        num = parseFloat(element.substr(element.indexOf('-') + 1, element.length));
-      }
-      if (match == barcode) {
-        count += num;
-      }
-    }
-    itemsCountArr.push({
-      barcode: match,
-      count: count
-    });
+function getCountInBarcode(barcode) {
+  if (barcode.indexOf('-') > 0) {
+    return parseFloat(barcode.substring(barcode.indexOf('-') + 1));
   }
-  return itemsCountArr;
+  return 1
 }
 
-function calculatePrice(itemsCountArr) {
-  let itemsInfo = loadAllItems();
-  let itemsPriceInfo = []
-  itemsCountArr.forEach(item => {
-    for (let index = 0; index < itemsInfo.length; index++) {
-      let itemInfo = itemsInfo[index];
-      if (item.barcode == itemInfo.barcode) {
-        itemsPriceInfo.push({
-          name: itemInfo.name,
-          count: item.count,
-          unit: itemInfo.unit,
-          price: itemInfo.price,
-          total: calculateTotal(item, itemInfo.price)
+function calculateTargetCount(collection, targetBarcode) {
+  let count = 0
+  for (const barcode of collection) {
+    const formatBarcode = getBarcodeWithoutSpecialChar(barcode)
+    if (formatBarcode === targetBarcode) {
+      count += getCountInBarcode(barcode)
+    }
+  }
+  return count
+}
+
+function calculateEachItemAmount(inputs) {
+  let result = []
+  let mark = new Set()
+  for (const barcode of inputs) {
+    const target = getBarcodeWithoutSpecialChar(barcode);
+    if (mark.has(target)) continue;
+    mark.add(target)
+    let matchResult = {
+      barcode: target,
+      count: calculateTargetCount(inputs, target)
+    }
+    result.push(matchResult)
+  }
+  return result
+}
+
+function generateEachItemReceipt(formatedBuyList, allproductsInfo, allPromotionsInfo) {
+  let receiptItems = [];
+  for (const buyListItemInfo of formatedBuyList) {
+    for (const productInfo of allproductsInfo) {
+      if (buyListItemInfo.barcode === productInfo.barcode) {
+        const {
+          name,
+          unit,
+          price
+        } = productInfo;
+        receiptItems.push({
+          info: {
+            name,
+            unit,
+            price,
+            count: buyListItemInfo.count
+          },
+          subtotal: calculateSubtotal(buyListItemInfo, price, allPromotionsInfo),
+          originalSubtotal: buyListItemInfo.count * price
         })
         break;
       }
     }
-  });
-  return itemsPriceInfo;
+  }
+  return receiptItems;
 }
 
-function calculateTotal(item, price) {
-  let promotionsInfo = loadPromotions();
-  for (let i = 0; i < promotionsInfo.length; i++) {
-    for (let index = 0; index < promotionsInfo[i].barcodes.length; index++) {
-      const barcode = promotionsInfo[i].barcodes[index];
+function calculateSubtotal(item, price, allPromotionsInfo) {
+  for (let promotionInfo of allPromotionsInfo) {
+    for (let barcode of promotionInfo.barcodes) {
       if (barcode == item.barcode) {
-        if (promotionsInfo[i].type == 'BUY_TWO_GET_ONE_FREE') {
-          saveMoney += (parseInt(item.count / 3)) * price;
-          return ((item.count - parseInt(item.count / 3)) * price).toFixed(2);
+        if (promotionInfo.type === 'BUY_TWO_GET_ONE_FREE') {
+          //   saveMoney += (parseInt(item.count / 3)) * price;
+          return ((item.count - parseInt(item.count / 3)) * price).toFixed(2)
         }
       }
     }
   }
-  return (item.count * price).toFixed(2);
+  return (item.count * price).toFixed(2)
 }
 
 function createReceipt(itemsPriceInfo) {
@@ -85,8 +118,8 @@ function createReceipt(itemsPriceInfo) {
   let str = '';
   str += '***<没钱赚商店>收据***\n';
   itemsPriceInfo.forEach(item => {
-    str += '名称：' + item.name + '，数量：' + item.count + item.unit + '，单价：' + item.price.toFixed(2) + '(元)，小计：' + item.total + '(元)\n';
-    total += parseFloat(item.total);
+    str += '名称：' + item.info.name + '，数量：' + item.info.count + item.info.unit + '，单价：' + item.info.price.toFixed(2) + '(元)，小计：' + item.subtotal + '(元)\n';
+    total += parseFloat(item.subtotal);
   });
 
   str += '----------------------\n';

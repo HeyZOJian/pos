@@ -57,7 +57,7 @@ describe('calculate the goods count', () => {
         count: 3
       }
     ];
-    expect(expectText).toEqual(calculateCount(tags));
+    expect(expectText).toEqual(calculateEachItemAmount(tags));
   })
 })
 
@@ -69,7 +69,7 @@ describe('calculate the good total price', () => {
     };
     const price = 15;
     const expectText = 37.5.toFixed(2);
-    expect(expectText).toEqual(calculateTotal(good, price));
+    expect(expectText).toEqual(calculateSubtotal(good, price, loadPromotions()));
   })
 })
 
@@ -77,7 +77,7 @@ describe('get the good barcode without amount', () => {
     it('should return array', () => {
       const barcode = 'ITEM000003-2.5';
       const expectText = 'ITEM000003';
-      expect(expectText).toEqual(getBarcode(barcode));
+      expect(expectText).toEqual(getBarcodeWithoutSpecialChar(barcode));
     })
   })
 
